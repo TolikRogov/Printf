@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#cmake -S ./ -B build/Release -DCMAKE_BUILD_TYPE=Release
+#cmake --build build/Release
+#./build/Release/Printf
+
+cmake -S ./ -B build/Debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/Debug
+./build/Debug/Printf
+
+#nasm -f elf64 printf.asm -o printf.o
