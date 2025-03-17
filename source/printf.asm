@@ -48,12 +48,20 @@ _start:												;input pointer
 ;	Destroy:	None
 ;==============================================================================
 printf:												;printf(char* string, ...)
-	mov rsi, [rsp + 8]								;rsi = &string
-	call strlen										;calc string length
-	mov rdx, rcx									;rdx = str_len
-	mov rax, 0x01									;write
-	mov rdi, Stdout									;output descriptor
-	syscall											;system instruction
+	mov rsi, [rsp + 8]								;&string
+
+	mov rdi, Buffer									;copy destination
+	xor rcx, rcx									;loop counter
+	copy_to_buffer:									;<------------------------------|
+		lodsb										;mov al, ds:[rsi] / inc rsi		|
+		cmp al, '$'									;if (al == '$') zf = 1			|
+ 		je end_printf								;if (zf == 1) goto end_printf---|---|
+		stosb										;mov ds:[rdi], al / inc rdi		|	|
+		add rcx, 2									;rcx += 2						|	|
+	loop copy_to_buffer								;-------------------------------|	|
+													;									|
+	end_printf:										;<----------------------------------|
+	call flush_buffer								;flush the buffer
 	ret
 ;==============================================================================
 
@@ -63,16 +71,31 @@ printf:												;printf(char* string, ...)
 ;	Exit:		RCX - string length
 ;	Destroy:	RCX, AL
 ;==============================================================================
-strlen:
-	push rsi
-	xor rcx, rcx
-	count:
-		lodsb
-		cmp al, '$'
-		je end_count
-		add rcx, 2
-	loop count
-	end_count:
-	pop rsi
+strlen:												;strlen(rsi)
+	push rsi										;save rsi
+	xor rcx, rcx									;rcx = 0
+	count:											;<----------------------------------|
+		lodsb										;mov al, ds:[rsi] / inc rsi			|
+		cmp al, '$'									;if (al == '$') zf = 1				|
+		je end_count								;if (zf == 1) goto end_count----|	|
+		add rcx, 2									;rcx += 2						|	|
+	loop count										;-------------------------------|---|
+	end_count:										;<------------------------------|
+	pop rsi											;back rsi | string start
+	ret
+;==============================================================================
+
+;==============================================================================
+;	Flush buffer
+;	Entry:		None
+;	Exit:		None
+;	Destroy:	RCX, AL
+;==============================================================================
+flush_buffer:
+	mov rsi, Buffer									;rsi = &Buffer
+	mov rdx, buffer_size							;rdx = buffer len
+	mov rax, 0x01									;write
+	mov rdi, Stdout									;output descriptor
+	syscall											;system instruction
 	ret
 ;==============================================================================
