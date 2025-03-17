@@ -4,8 +4,10 @@
 #cmake --build build/Release
 #./build/Release/Printf
 
-cmake -S ./ -B build/Debug -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/Debug
-./build/Debug/Printf
+#cmake -S ./ -B build/Debug -DCMAKE_BUILD_TYPE=Debug
+#cmake --build build/Debug
+#./build/Debug/Printf
 
-#nasm -f elf64 printf.asm -o printf.o
+nasm -f elf64 source/printf.asm -o build/printf.o -l build/printf.lst
+ld -o build/printf build/printf.o
+./build/printf
