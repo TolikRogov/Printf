@@ -1,8 +1,10 @@
 #include <stdio.h>
 
+void my_printf(const char*);
+
 int main() {
 
-	printf("Hello, world!\n");
+	my_printf("Fuck you!");
 
 	return 0;
 }

@@ -15,7 +15,12 @@ ld:
 	@ld build/printf.o -static -lc -o build/printf
 	@./build/printf
 
-gcc:
+c-in-asm:
 	@nasm -f elf64 source/printf.s -o build/printf.o -l build/printf.lst
 	@gcc build/printf.o -static -o build/printf -z noexecstack
+	@./build/printf
+
+asm-in-c:
+	@nasm -f elf64 source/printf.s -o build/printf.o -l build/printf.lst
+	@gcc source/main.cpp build/printf.o -o build/printf
 	@./build/printf
