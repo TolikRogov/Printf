@@ -2,17 +2,18 @@
 ;					My Printf 16.03.2025 @Rogov Anatoliy
 ;==============================================================================
 
-global main											;make global for linker
+global my_printf									;make global for linker
 
 extern printf										;link function printf from standard library
 extern exit											;link function exit from standard library
 
 section .data										;start of data segment
-String 			db "My string: %s %x %d%%%c", 10, 0
+String 			db "My string: %s %x %d%%%c %b", 10, 0
 SpecifierS 		db "I love", 0
 SpecifierX		dq 3802
 SpecifierD		dd 100
 SpecifierC		db '!'
+SuperSpecifier	dd -52
 Stdout 			equ 0x01							;descriptor of stdout
 buffer_size 	equ 128								;size of buffer
 trans_buff_size	equ 64								;size of translator buffer
@@ -27,49 +28,35 @@ jump_table 	dq 	_b_
 			dq	_s_
 			times 'x' - 's' - 1 dq _default_
 			dq	_x_
+symbols_array db '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
 
 section .bss										;start non-prog segment
 Buffer 			resb buffer_size					;Init buffer
 trans_buffer 	resb trans_buff_size				;Init trans buffer
 
 section .text										;start of code segment
-main:												;input pointer
-	sub rsp, 8										;alignment in 16 bytes
-	mov rdi, String									;format string
-	mov rsi, SpecifierS								;first argument
-	mov rdx, [SpecifierX]							;second argument
-	mov rcx, [SpecifierD]							;third argument
-	mov r8, [SpecifierC]							;fourth argument
-	call printf										;call standard printf
-	add rsp, 8										;return stack pointer to default alignment
-
-	;prolog
-	push rbp
-	push rbx
-	push r12
-	push r13
-	push r14
-	push r15
-
-	;cdecl
-	mov rbp, rsp
-	mov rdi, String									;format string
-	mov rsi, SpecifierS								;first argument
-	mov rdx, [SpecifierX]							;second argument
-	mov ecx, [SpecifierD]							;third argument
-	mov r8, [SpecifierC]							;fourth argument
-	call my_printf									;function call
-	mov rsp, rbp
-
-	;epilog
-	pop r15
-	pop r14
-	pop r13
-	pop r12
-	pop rbx
-	pop rbp
-
-	call exit
+; main:												;input pointer
+; 	sub rsp, 8										;alignment in 16 bytes
+; 	mov rdi, String									;format string
+; 	mov rsi, SpecifierS								;first argument
+; 	mov rdx, [SpecifierX]							;second argument
+; 	mov rcx, [SpecifierD]							;third argument
+; 	mov r8, [SpecifierC]							;fourth argument
+; 	mov r9, [SuperSpecifier]						;fifth argument
+; 	call printf										;call standard printf
+; 	add rsp, 8										;return stack pointer to default alignment
+;
+; 	mov rbp, rsp									;save rsp
+; 	mov rdi, String									;format string
+; 	mov rsi, SpecifierS								;first argument
+; 	mov rdx, [SpecifierX]							;second argument
+; 	mov ecx, [SpecifierD]							;third argument
+; 	mov r8, [SpecifierC]							;fourth argument
+; 	mov r9, [SuperSpecifier]						;fifth argument
+; 	call my_printf									;function call
+; 	mov rsp, rbp									;return rsp to flush parameters in stack
+;
+; 	call exit
 
 ;==============================================================================
 ;	Prints string to stdout
@@ -80,16 +67,23 @@ main:												;input pointer
 ;==============================================================================
 my_printf:											;printf(char* string, ...)
 	pop r10											;returning address
-	push r9
-	push r8
-	push rcx
-	push rdx
-	push rsi
-	push rdi
+	push r9											;6th argument
+	push r8											;5th argument
+	push rcx										;4th argument
+	push rdx										;3th argument
+	push rsi										;2th argument
+	push rdi										;1th argument
 	mov r11, rsp									;start of parameters in stack
 
+	push rbp
+	push rbx
+	push r12
+	push r13										;saved registers
+	push r14
+	push r15
+
 	mov rsi, [r11]									;first format string
-	add r11, 8
+	add r11, 8										;next argument
 
 	mov rdi, Buffer									;copy destination
 	copy_to_buffer:									;<------------------------------|
@@ -106,7 +100,17 @@ my_printf:											;printf(char* string, ...)
 													;									|
 	end_printf:										;<----------------------------------|
 	call flush_buffer								;flush the buffer
-	push r10
+
+	pop r15
+	pop r14
+	pop r13
+	pop r12											;return saved registers
+	pop rbx
+	pop rbp
+
+	add rsp, 48										;return rsp above the 6th arguments
+
+	push r10										;put return address
 	ret
 ;==============================================================================
 
@@ -120,15 +124,15 @@ check_buffer:
 	push rbx										;save rbx
 	xor rbx, rbx									;rbx = 0
 	add rbx, rdi									;rbx += rdi
-	sub rbx, Buffer									;rbx - Buffer
+	sub rbx, Buffer									;rbx -= Buffer
 
 	cmp rbx, buffer_size							;if (rbx == buffer_size) zf = 1
-	jne skip_flush									;if (zf != 1) goto skip_flush---|
+	jb skip_flush									;if (zf < 0) goto skip_flush ---|
 		call flush_buffer							;call buffer flush				|
 		mov rdi, Buffer								;set rdi on buffer start		|
 													;								|
 	skip_flush:										;<------------------------------|
-	stosb											;mov ds:[rdi], al / inc rdi
+	stosb											;mov [rdi], al / inc rdi
 	pop rbx											;return rbx
 	ret
 ;==============================================================================
@@ -144,6 +148,7 @@ flush_buffer:
 	push rdx										;save rdx
 	push rax										;save rax
 	push rcx										;save rcx
+	push r11										;save r11 which is changed by syscall
 	mov rsi, Buffer									;rsi = &Buffer
 	mov rdx, buffer_size							;rdx = buffer len
 	mov rax, 0x01									;write
@@ -154,6 +159,7 @@ flush_buffer:
 	mov rdi, Buffer									;rdi = buffer start
 	xor rax, rax									;rax = 0
 	rep stosb										;while (rcx--) stosb
+	pop r11											;return r11
 	pop rcx											;return rcx
 	pop rax											;return rax
 	pop rdx											;return rdx
@@ -215,68 +221,122 @@ GetArg:
 ;	Destroy:	None
 ;==============================================================================
 _s_:
-	call strlen
-	str_to_buffer:
-		lodsb
-		call check_buffer
-	loop str_to_buffer
-	pop rsi
-	jmp _default_
+	call strlen										;calc len of string
+	str_to_buffer:									;put str symbol to Buffer <---------|
+		lodsb										;mov al, [rsi] / inc rsi			|
+		call check_buffer							;check buffer overflow / put symbol	|
+	loop str_to_buffer								;-----------------------------------|
+	pop rsi											;return rsi to format string
+	jmp _default_									;goto _default_
 
 _c_:
-	mov rax, rsi
-	call check_buffer
-	pop rsi
-	jmp _default_
+	mov rax, rsi									;rax = rsi | put symbol to rax
+	call check_buffer								;check buffer overflow / put symbol
+	pop rsi											;return rsi to format string
+	jmp _default_									;goto _default_
 
 _b_:
-	pop rsi
-	jmp _default_
+	mov rcx, 1										;amount of bytes per one symbol
+	mov rbx, 0x01									;mask for binary
+	jmp _numbers_2_systems_							;goto _numbers_2_systems_
 
 _o_:
-	pop rsi
-	jmp _default_
+	mov rcx, 3										;amount of bytes per one symbol
+	mov rbx, 0x07									;mask for oct
+	jmp _numbers_2_systems_							;goto _numbers_2_systems_
 
 _x_:
-	pop rsi
-	jmp _default_
+	mov rcx, 4										;amount of bytes per one symbol
+	mov rbx, 0x0F									;mask for hex
+	jmp _numbers_2_systems_							;goto _numbers_2_systems_
 
 _default_:
-	jmp copy_to_buffer
+	jmp copy_to_buffer								;goto copy_to_buffer
 ;==============================================================================
 
 ;==============================================================================
 ;	Handler %d parameter
-;	Entry:		None
+;	Entry:		RSI - number to transform
 ;	Exit:		None
 ;	Destroy:	None
 ;==============================================================================
 _d_:
-	push rdi
-	mov rdi, trans_buffer
-	mov rcx, 10
-	mov rax, rsi
-	division:
-		cqo
-		div rcx
-		add rdx, '0'
-		mov [rdi], rdx
-		inc rdi
-		cmp rax, 0
-	ja division
-	mov rsi, rdi
-	pop rdi
+	mov rax, rsi									;rax = rsi | put number to rax
 
-	mov rcx, rsi
-	sub rcx, trans_buffer
-	inc rcx
+	shr rax, 31										;get sign bit
+	cmp rax, 1										;if (rax == 1) zf = 0
+	jne unsigned									;if (zf != 0) goto unsigned	--------|
+	mov rax, '-'									;rax = '-'							|
+	call check_buffer								;check buffer overflow | put symbol	|
+	mov rax, rsi									;prepare number to negative			|
+	neg eax											;rax *= -1							|
+	mov rsi, rax									;rsi = rax							|
+													;									|
+	unsigned:										;<----------------------------------|
+		push rdi									;save current Buffer ip
+		mov rdi, trans_buffer						;rdi = &trans_buffer
+		mov rcx, 10									;rcx = 10 | ss base
+		mov rax, rsi								;rax = rsi
 
-	put_to_buffer:
-		movsb
-		inc rdi
-		sub rsi, 2
-	loop put_to_buffer
+	division:										;<----------------------------------------------|
+		cqo											;dd rax -> dq rdx:rax by sign bit duplicating	|
+		div rcx										;rdx:rax /= rcx // rax - result // rdx - part	|
+		add rdx, '0'								;rdx += 30										|
+		mov [rdi], rdx								;trans_buffer[i] = 'c'							|
+		inc rdi										;rdi++											|
+		cmp rax, 0									;if (rax == 0) zf = 0							|
+	ja division										;if (zf > 0) goto division ---------------------|
 
-	pop rsi
-	jmp _default_
+	jmp _to_printf_buffer_							;goto _to_printf_buffer_
+;==============================================================================
+
+;==============================================================================
+;	Handler of binary system parameter
+;	Entry:		RCX - binary base
+;				RBX - mask
+;				RSI - number
+;	Exit:		None
+;	Destroy:	None
+;==============================================================================
+_numbers_2_systems_:
+	push rdi										;save current Buffer ip
+	mov rdi, trans_buffer							;rdi = &trans_buffer_
+
+	transform:										;<----------------------------------|
+		mov rax, rsi								;rax = rsi							|
+		and rax, rbx								;use mask							|
+		mov rdx, symbols_array						;rdx = &symbols_array				|
+		add rdx, rax								;rdx += rax | get symbol ASCII code	|
+		mov al, [rdx]								;al = [rdx] | symbol				|
+		stosb										;mov [rdi], al / inc rdi			|
+		shr rsi, cl									;rsi >> cl							|
+		cmp rsi, 0									;if (rsi == 0) zf = 0				|
+	ja transform									;if (zf > 0) goto transform --------|
+
+	jmp _to_printf_buffer_							;goto _to_printf_buffer_
+;==============================================================================
+
+;==============================================================================
+;	From transform buffer to printf buffer
+;	Entry:		RDI - pointer to end of transform buffer
+;	Exit:		None
+;	Destroy:	None
+;==============================================================================
+_to_printf_buffer_:
+	mov rsi, rdi									;rsi = rdi
+	pop rdi											;return current Buffer ip
+
+	mov rcx, rsi									;rcx = rsi
+	sub rcx, trans_buffer							;rcx = rsi - trans_buffer
+	inc rcx											;rcx++
+
+	put_to_buffer:									;<--------------------------------------|
+		mov al, [rsi]								;al = [rsi] | symbol from trans_buffer	|
+		call check_buffer							;check Buffer overflow | put symbol		|
+		mov [rsi], dword 0							;[rsi] = 0								|
+		dec rsi										;rsi--									|
+	loop put_to_buffer								;while(rcx--) goto put_to_buffer -------|
+
+	pop rsi											;return current format string ip
+	jmp _default_									;goto _default_
 ;==============================================================================
