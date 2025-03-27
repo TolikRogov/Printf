@@ -2,9 +2,14 @@
 ;					My Printf 16.03.2025 @Rogov Anatoliy
 ;==============================================================================
 
-global my_printf									;make global for linker
+global main											;make global for linker
+
+extern printf										;link function printf from standard library
+extern exit
 
 section .data										;start of data segment
+String 			db "My string: %s %x %d%%%c %b", 10, 0
+SpecifierS 		db "I love", 0
 Stdout 			equ 0x01							;descriptor of stdout
 buffer_size 	equ 128								;size of buffer
 trans_buff_size	equ 64								;size of translator buffer
@@ -26,6 +31,28 @@ Buffer 			resb buffer_size					;Init buffer
 trans_buffer 	resb trans_buff_size				;Init trans buffer
 
 section .text										;start of code segment
+main:												;input pointer
+	sub rsp, 8										;alignment in 16 bytes
+	mov rdi, String									;format string
+	mov rsi, SpecifierS								;first argument
+	mov rdx, 3802									;second argument
+	mov rcx, 100									;third argument
+	mov r8, '!'										;fourth argument
+	mov r9, -52										;fifth argument
+	call printf										;call standard printf
+	add rsp, 8										;return stack pointer to default alignment
+
+	mov rbp, rsp									;save rsp
+	mov rdi, String									;format string
+	mov rsi, SpecifierS								;first argument
+	mov rdx, 3802									;second argument
+	mov ecx, 100									;third argument
+	mov r8, '!'										;fourth argument
+	mov r9, -52										;fifth argument
+	call my_printf									;function call
+	mov rsp, rbp									;return rsp to flush parameters in stack
+
+	call exit
 
 ;==============================================================================
 ;	Prints string to stdout
@@ -253,7 +280,7 @@ _d_:
 		add rdx, '0'								;rdx += 30										|
 		mov [rdi], rdx								;trans_buffer[i] = 'c'							|
 		inc rdi										;rdi++											|
-		cmp rax, 0									;if (rax == 0) zf = 0							|
+		cmp eax, 0									;if (rax == 0) zf = 0							|
 	ja division										;if (zf > 0) goto division ---------------------|
 
 	jmp _to_printf_buffer_							;goto _to_printf_buffer_
