@@ -12,10 +12,16 @@
 #ld build/printf.o -static -lc -o build/printf
 #./build/printf
 
-nasm -f elf64 source/printf.s -o build/printf.o -l build/printf.lst
-g++ -static source/main.cpp build/printf.o -o build/printf -z noexecstack
-./build/printf
+# nasm -f elf64 source/printf.s -o build/printf.o -l build/printf.lst
+# g++ -static source/main.cpp build/printf.o -o build/printf -z noexecstack
+# ./build/printf
 
 # nasm -f elf64 source/asm.s -o build/asm.o -l build/asm.lst
 # gcc build/asm.o -static -o build/asm -z noexecstack
 # ./build/asm
+
+nasm -f elf64 source/printf.s -o build/printf.o -l build/printf.lst && \
+nasm -f elf64 source/scanf.s -o build/scanf.o -l build/scanf.lst && \
+nasm -f elf64 source/asm.s -o build/asm.o -l build/asm.lst && \
+gcc build/asm.o build/printf.o build/scanf.o -static -o build/asm -z noexecstack && \
+./build/asm
