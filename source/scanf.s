@@ -18,7 +18,6 @@ jump_table 	dq 	_b_
 			dq	_s_
 			times 'x' - 's' - 1 dq _default_
 			dq	_x_
-symbols_array db '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
 
 section .bss										;start non-prog segment
 Buffer 			resb buffer_size					;Init buffer
@@ -66,6 +65,7 @@ my_scanf:											;scanf(char* string, int* digit)
 													;									|
 	end_printf:										;<----------------------------------|
 
+	pop rax
 	pop r15
 	pop r14
 	pop r13
@@ -73,8 +73,9 @@ my_scanf:											;scanf(char* string, int* digit)
 	pop rbx
 	pop rbp
 
-	add rsp, 48										;return rsp above the 6th arguments
+	add rsp, 56										;return rsp above the 6th arguments
 
+	push rax
 	push r10										;put return address
 	ret
 ;==============================================================================
@@ -215,5 +216,6 @@ _d_:
 	pop rbx											;return
 	pop r13											;return
 	pop rsi											;return current format string ip
+	push rax
 	jmp _default_									;goto _default_
 ;==============================================================================
