@@ -8,6 +8,7 @@ section .data										;start of data segment
 Stdout 			equ 0x01							;descriptor of stdout
 buffer_size 	equ 128								;size of buffer
 trans_buff_size	equ 64								;size of translator buffer
+sign_mask		dd 1<<31
 
 section .rodata
 jump_table 	dq 	_b_
@@ -232,9 +233,10 @@ _default_:
 _d_:
 	mov rax, rsi									;rax = rsi | put number to rax
 
-	shr rax, 31										;get sign bit
-	cmp rax, 1										;if (rax == 1) zf = 0
-	jne unsigned									;if (zf != 0) goto unsigned	--------|
+	push r13										;save r13
+	mov r13, [sign_mask]							;r13 = 1 << 31
+	and rax, r13									;rax &= 1 << 31
+	jz unsigned										;if (zf != 0) goto unsigned	--------|
 	mov rax, '-'									;rax = '-'							|
 	call check_buffer								;check buffer overflow | put symbol	|
 	mov rax, rsi									;prepare number to negative			|
@@ -242,6 +244,7 @@ _d_:
 	mov rsi, rax									;rsi = rax							|
 													;									|
 	unsigned:										;<----------------------------------|
+		pop r13										;return r13
 		push rdi									;save current Buffer ip
 		mov rdi, trans_buffer						;rdi = &trans_buffer
 		mov rcx, 10									;rcx = 10 | ss base
